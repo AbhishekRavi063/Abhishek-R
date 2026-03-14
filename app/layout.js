@@ -6,10 +6,20 @@ const plusJakarta = Plus_Jakarta_Sans({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://abhishek-r.vercel.app";
+
 export const metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Abhishek R",
   description:
     "Portfolio of Abhishek R – full-stack engineer and BCI/EEG researcher building intelligent products and neural interfaces.",
+  openGraph: {
+    images: ["/herobg.jpg"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/herobg.jpg"],
+  },
 };
 
 export default function RootLayout({ children }) {

@@ -93,36 +93,41 @@ export default function SkillsBubbles() {
       ];
 
 
+      const isMobile = width < 640;
       const spinnerRadius = Math.min(50, Math.min(width, height) * 0.12);
       const leafCount = 3;
       let spinnerAngle = 0;
       let spinnerSpeed = 0.02;
 
-      const spinnerOffset = Math.min(160, width * 0.22);
-      const spinnerLeftX = spinnerOffset;
-      const spinnerRightX = width - spinnerOffset;
+      const spinnerCenterX = width / 2;
       const spinnerY = height / 2;
 
-      const spinnerLeftBody = Matter.Bodies.circle(spinnerLeftX, spinnerY, spinnerRadius, {
-        isStatic: true,
-        isSensor: true,
-        label: "spinner",
-      });
-      const spinnerRightBody = Matter.Bodies.circle(spinnerRightX, spinnerY, spinnerRadius, {
-        isStatic: true,
-        isSensor: true,
-        label: "spinner",
-      });
-      Matter.Composite.add(engine.world, [spinnerLeftBody, spinnerRightBody]);
+      let spinners = [];
 
-      const spinners = [
-        { x: spinnerLeftX, y: spinnerY, radius: spinnerRadius, leafCount, rotation: 1 },
-        { x: spinnerRightX, y: spinnerY, radius: spinnerRadius, leafCount, rotation: -1 },
-      ];
+      if (isMobile) {
+        const centerBody = Matter.Bodies.circle(spinnerCenterX, spinnerY, spinnerRadius, {
+          isStatic: true,
+          isSensor: true,
+          label: "spinner",
+        });
+        Matter.Composite.add(engine.world, [centerBody]);
+        spinners = [{ x: spinnerCenterX, y: spinnerY, radius: spinnerRadius, leafCount, rotation: 1 }];
+      } else {
+        const spinnerOffset = Math.min(160, width * 0.22);
+        const spinnerLeftX = spinnerOffset;
+        const spinnerRightX = width - spinnerOffset;
+        Matter.Composite.add(engine.world, [
+          Matter.Bodies.circle(spinnerLeftX, spinnerY, spinnerRadius, { isStatic: true, isSensor: true, label: "spinner" }),
+          Matter.Bodies.circle(spinnerRightX, spinnerY, spinnerRadius, { isStatic: true, isSensor: true, label: "spinner" }),
+        ]);
+        spinners = [
+          { x: spinnerLeftX, y: spinnerY, radius: spinnerRadius, leafCount, rotation: 1 },
+          { x: spinnerRightX, y: spinnerY, radius: spinnerRadius, leafCount, rotation: -1 },
+        ];
+      }
 
       // Create "SKILLS" text as physics bodies - use thin strokes to match letter shapes
       const skillsText = "SKILLS";
-      const isMobile = width < 640;
       const fontSize = isMobile ? height * 0.09 : height * 0.13;
       const letterSpacing = isMobile ? width * 0.11 : width * 0.09;
       const strokeWidth = fontSize * 0.15; // thin stroke width
@@ -486,11 +491,17 @@ export default function SkillsBubbles() {
           }
 
           ctx.fillStyle = "#1a1a2e";
-          const fontSize = isMobile ? Math.max(r * 0.3, 10) : r * 0.26;
+          const fontSize = isMobile ? Math.max(r * 0.22, 8) : r * 0.26;
           ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "top";
-          ctx.fillText(skill.name, 0, -r * 0.3 + logoMaxSize + 6);
+          const textY = -r * 0.3 + logoMaxSize + 6;
+          if (isMobile) {
+            const maxTextWidth = r * 1.4;
+            ctx.fillText(skill.name, 0, textY, maxTextWidth);
+          } else {
+            ctx.fillText(skill.name, 0, textY);
+          }
 
           ctx.restore();
         });
