@@ -182,7 +182,7 @@ export default function SkillsBubbles() {
         Matter.Composite.add(engine.world, letterBodies);
       }
 
-      const baseRadius = Math.min(width, height) * 0.04;
+      const baseRadius = isMobile ? Math.min(width, height) * 0.065 : Math.min(width, height) * 0.04;
 
       const bubbles = SKILLS.map((skill) => {
         const textLen = skill.name.length;
@@ -466,7 +466,7 @@ export default function SkillsBubbles() {
           ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
           ctx.fill();
 
-          const logoMaxSize = r * 0.55;
+          const logoMaxSize = isMobile ? Math.max(r * 0.6, 18) : r * 0.55;
           const img = loadedImages[skill.logo];
           if (img && img.complete && img.naturalWidth > 0) {
             const aspectRatio = img.naturalWidth / img.naturalHeight;
@@ -486,7 +486,8 @@ export default function SkillsBubbles() {
           }
 
           ctx.fillStyle = "#1a1a2e";
-          ctx.font = `600 ${r * 0.26}px system-ui, -apple-system, sans-serif`;
+          const fontSize = isMobile ? Math.max(r * 0.3, 10) : r * 0.26;
+          ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "top";
           ctx.fillText(skill.name, 0, -r * 0.3 + logoMaxSize + 6);
