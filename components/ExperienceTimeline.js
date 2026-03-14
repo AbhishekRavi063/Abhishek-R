@@ -120,20 +120,18 @@ export default function ExperienceTimeline({ scrollProgress }) {
                   />
                 </div>
 
-                {/* Content – no card, just text with shadow */}
+                {/* Content – designation main, company & location secondary */}
                 <div
                   className="flex-1 min-w-0"
                   style={{
                     textShadow: "0 2px 6px rgba(0,0,0,0.6), 0 0 12px rgba(0,0,0,0.3)",
                   }}
                 >
-                  <div className="flex flex-wrap items-baseline gap-1 sm:gap-2">
-                    <span className="font-semibold text-white text-base sm:text-lg">{exp.role}</span>
-                    <span className="text-white/80 text-xs sm:text-sm">@ {exp.org}</span>
-                    {exp.location && (
-                      <span className="text-white/60 text-sm">· {exp.location}</span>
-                    )}
-                  </div>
+                  <h3 className="font-semibold text-white text-base sm:text-lg">{exp.role}</h3>
+                  <p className="text-white/80 text-xs sm:text-sm mt-0.5">
+                    {exp.org}
+                    {exp.location && ` · ${exp.location}`}
+                  </p>
                   <p className="text-white/70 text-xs sm:text-sm mt-0.5">{exp.period}</p>
                 </div>
               </div>

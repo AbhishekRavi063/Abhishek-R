@@ -73,11 +73,15 @@ export default function SkillsBubbles() {
 
       const width = container.offsetWidth;
       const height = container.offsetHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
 
       const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
 
       const engine = Matter.Engine.create({
         gravity: { x: 0, y: 0 },
@@ -445,33 +449,37 @@ export default function SkillsBubbles() {
           ctx.save();
           ctx.translate(x, y);
 
-          const gradient = ctx.createRadialGradient(0, -r * 0.3, 0, 0, 0, r);
-          gradient.addColorStop(0, "rgba(255, 255, 255, 0.95)");
-          gradient.addColorStop(0.5, "rgba(240, 240, 245, 0.9)");
-          gradient.addColorStop(1, "rgba(220, 225, 235, 0.85)");
+          if (isMobile) {
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.08)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          } else {
+            const gradient = ctx.createRadialGradient(0, -r * 0.3, 0, 0, 0, r);
+            gradient.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+            gradient.addColorStop(0.5, "rgba(240, 240, 245, 0.9)");
+            gradient.addColorStop(1, "rgba(220, 225, 235, 0.85)");
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
+            ctx.shadowBlur = 12;
+            ctx.shadowOffsetY = 4;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.shadowColor = "transparent";
+            ctx.beginPath();
+            ctx.arc(-r * 0.25, -r * 0.3, r * 0.15, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+            ctx.fill();
+          }
 
-          ctx.beginPath();
-          ctx.arc(0, 0, r, 0, Math.PI * 2);
-          ctx.fillStyle = gradient;
-          ctx.fill();
-
-          ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
-          ctx.shadowBlur = 12;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 4;
-
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-          ctx.lineWidth = 2;
-          ctx.stroke();
-
-          ctx.shadowColor = "transparent";
-
-          ctx.beginPath();
-          ctx.arc(-r * 0.25, -r * 0.3, r * 0.15, 0, Math.PI * 2);
-          ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
-          ctx.fill();
-
-          const logoMaxSize = isMobile ? Math.max(r * 0.6, 18) : r * 0.55;
+          const logoMaxSize = isMobile ? Math.max(r * 0.65, 20) : r * 0.55;
           const img = loadedImages[skill.logo];
           if (img && img.complete && img.naturalWidth > 0) {
             const aspectRatio = img.naturalWidth / img.naturalHeight;
@@ -490,8 +498,8 @@ export default function SkillsBubbles() {
             ctx.drawImage(img, logoX, logoY, logoWidth, logoHeight);
           }
 
-          ctx.fillStyle = "#1a1a2e";
-          const fontSize = isMobile ? Math.max(r * 0.22, 8) : r * 0.26;
+          ctx.fillStyle = isMobile ? "#0f0f1a" : "#1a1a2e";
+          const fontSize = isMobile ? Math.max(r * 0.25, 9) : r * 0.26;
           ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "top";
