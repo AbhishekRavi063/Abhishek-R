@@ -33,6 +33,8 @@ export default function Home() {
   const currentDessertFrameRef = useRef(-1);
   const [dessertFramesLoaded, setDessertFramesLoaded] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadProgress, setLoadProgress] = useState(0);
   const headerNavRef = useRef(null);
 
   const TOTAL_FRAMES = 150;
@@ -290,6 +292,43 @@ export default function Home() {
     return () => observer.disconnect();
   }, []);
 
+  // Initial load overlay - progress bar tracks hero images, hides when all loaded
+  useEffect(() => {
+    const minTime = 600;
+    const start = performance.now();
+
+    const heroImages = [
+      "/herobg.jpg",
+      "/herocloud.png",
+      "/cloud.png",
+    ];
+    const total = heroImages.length;
+    let loaded = 0;
+
+    const onLoad = () => {
+      loaded++;
+      setLoadProgress(Math.round((loaded / total) * 100));
+      if (loaded >= total) {
+        const elapsed = performance.now() - start;
+        const remaining = Math.max(0, minTime - elapsed);
+        setTimeout(() => setIsLoading(false), remaining);
+      }
+    };
+
+    heroImages.forEach((src) => {
+      const img = new Image();
+      img.onload = onLoad;
+      img.onerror = onLoad;
+      img.src = src;
+    });
+
+    // Fallback if images take too long
+    setTimeout(() => {
+      setLoadProgress(100);
+      setIsLoading(false);
+    }, 5000);
+  }, []);
+
   useEffect(() => {
     if (!mobileMenuOpen) return;
     const handleClickOutside = (e) => {
@@ -303,6 +342,24 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white text-black">
+      {/* Loading overlay */}
+      <div
+        className={`fixed inset-0 z-[100] flex items-center justify-center bg-white transition-opacity duration-[1200ms] ease-out pointer-events-none ${
+          isLoading ? "opacity-100" : "opacity-0"
+        }`}
+        style={{ pointerEvents: isLoading ? "auto" : "none" }}
+        aria-hidden={!isLoading}
+      >
+        <div className="flex flex-col items-center gap-5 w-full max-w-xs px-6">
+          <p className="text-base sm:text-lg text-gray-700 font-medium">Setting up things</p>
+          <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-cyan-500 rounded-full transition-[width] duration-300 ease-out"
+              style={{ width: `${loadProgress}%` }}
+            />
+          </div>
+        </div>
+      </div>
       <header ref={headerRef} className="fixed inset-x-0 top-2 sm:top-4 z-20 flex justify-center px-2 sm:px-0 pointer-events-none transition-none" style={{ willChange: "transform" }}>
         <div ref={headerNavRef} className="pointer-events-auto relative flex flex-col items-center w-full max-w-[calc(92%+8px)] sm:max-w-none sm:w-3/4 md:w-2/3 lg:w-1/2">
         <nav className="flex w-[92%] sm:w-full items-center justify-between rounded-full border border-white/40 bg-white/20 px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm text-black shadow-lg backdrop-blur-md">
@@ -343,7 +400,7 @@ export default function Home() {
       <section
         id="hero"
         ref={heroRef}
-        className="relative flex min-h-[110vh] items-center justify-center overflow-hidden"
+        className="relative flex min-h-[100vh] items-center justify-center overflow-hidden"
       >
         <div
           ref={heroBgRef}
