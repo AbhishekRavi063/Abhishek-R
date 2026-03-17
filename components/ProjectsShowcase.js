@@ -194,9 +194,46 @@ function useWindowWidth() {
 export default function ProjectsShowcase() {
   const trackRef = useRef(null);
   const containerRef = useRef(null);
+  const sectionRef = useRef(null);
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [parallax, setParallax] = useState({ bgY: 0, bgX: 0, headingY: 0, headingScale: 1, cardsY: 0 });
   const { width: winW, mounted } = useWindowWidth();
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    let rafId = null;
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const rect = section.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const inView = rect.top < vh * 1.2 && rect.bottom > -vh * 0.2;
+        if (!inView) return;
+
+        const progress = Math.max(0, Math.min(1, (vh * 0.6 - rect.top) / (vh * 0.8)));
+        const scrollParallax = (rect.top - vh * 0.4) * 0.15;
+
+        setParallax({
+          bgY: scrollParallax * 1.2,
+          bgX: scrollParallax * 0.8,
+          headingY: (1 - progress) * 60,
+          headingScale: 0.88 + progress * 0.12,
+          cardsY: (1 - progress) * 35,
+        });
+      });
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   const duplicated = [...PROJECTS, ...PROJECTS];
   // Use consistent values during SSR/initial hydration to avoid mismatch
@@ -206,6 +243,7 @@ export default function ProjectsShowcase() {
 
   return (
       <section
+        ref={sectionRef}
         id="projects"
         className="relative min-h-[80vh] sm:min-h-screen py-12 sm:py-16 md:py-20 overflow-hidden"
       style={{
@@ -215,9 +253,14 @@ export default function ProjectsShowcase() {
           linear-gradient(90deg, rgba(100, 150, 255, 0.03) 1px, transparent 1px)
         `,
         backgroundSize: "60px 60px",
+        backgroundPosition: `${parallax.bgX}px ${parallax.bgY}px`,
+        transition: "background-position 0.15s ease-out",
       }}
     >
-      <div className="text-center mb-8 sm:mb-12 md:mb-16 px-4">
+      <div
+        className="text-center mb-8 sm:mb-12 md:mb-16 px-4 will-change-transform"
+        style={{ transform: `translateY(${parallax.headingY}px) scale(${parallax.headingScale})`, transition: "transform 0.1s ease-out" }}
+      >
         <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 sm:mb-4 bg-gradient-to-r from-white via-cyan-200/90 to-white bg-clip-text text-transparent">
           Projects
         </h2>
@@ -229,7 +272,8 @@ export default function ProjectsShowcase() {
       <div
         ref={containerRef}
         data-carousel-container
-        className="relative overflow-hidden pt-12 sm:pt-0"
+        className="relative overflow-hidden pt-12 sm:pt-0 will-change-transform"
+        style={{ transform: `translateY(${parallax.cardsY}px)`, transition: "transform 0.12s ease-out" }}
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import SkillsBubbles from "@/components/SkillsBubbles";
-import SignalFilter from "@/components/SignalFilter";
+import dynamic from "next/dynamic";
 import ProjectsShowcase from "@/components/ProjectsShowcase";
 import ContactSection from "@/components/ContactSection";
 import ExperienceTimeline from "@/components/ExperienceTimeline";
 import DessertAbout from "@/components/DessertAbout";
+import SpaceshipAbout from "@/components/SpaceshipAbout";
 import AboutTerminal from "@/components/AboutTerminal";
+const SkillsBubbles = dynamic(() => import("@/components/SkillsBubbles"), { ssr: false });
+const SignalFilter = dynamic(() => import("@/components/SignalFilter"), { ssr: false });
 
 export default function Home() {
   const heroRef = useRef(null);
@@ -32,30 +34,62 @@ export default function Home() {
   const dessertCtxRef = useRef(null);
   const currentDessertFrameRef = useRef(-1);
   const [dessertFramesLoaded, setDessertFramesLoaded] = useState(false);
+
+  // Spaceship scroll animation (before skills)
+  const spaceshipSectionRef = useRef(null);
+  const spaceshipCanvasRef = useRef(null);
+  const spaceshipFramesRef = useRef([]);
+  const spaceshipCtxRef = useRef(null);
+  const currentSpaceshipFrameRef = useRef(-1);
+  const [spaceshipFramesLoaded, setSpaceshipFramesLoaded] = useState(false);
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   const headerNavRef = useRef(null);
+  const heroHoverRef = useRef(false);
+  const heroPushAmountRef = useRef(0);
 
   const TOTAL_FRAMES = 150;
   const TOTAL_DESSERT_FRAMES = 130;
+  const TOTAL_SPACESHIP_FRAMES = 240;
   const rafRef = useRef(null);
   const [hillScrollProgress, setHillScrollProgress] = useState(0);
+  const desertCurrentProgressRef = useRef(0);
+  const dessertCurrentProgressRef = useRef(0);
+  const spaceshipCurrentProgressRef = useRef(0);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const handleScroll = () => {
-      if (rafRef.current) return;
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = null;
-        updateAnimations();
-      });
+    const easeInOutCubic = (t) => {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    };
+    const lazyEase = (t) => 1 - Math.pow(1 - t, 1.8);
+    const baseLerpSpeed = 0.055;
+    const getLerpSpeed = (gap) => {
+      if (gap < 0.003) return baseLerpSpeed * 0.03;
+      if (gap < 0.01) return baseLerpSpeed * (0.03 + 0.17 * (gap - 0.003) / 0.007);
+      if (gap < 0.03) return baseLerpSpeed * (0.2 + 0.5 * (gap - 0.01) / 0.02);
+      return baseLerpSpeed;
     };
 
-    const easeInOutCubic = (t) => {
-      return t < 0.5
-        ? 4 * t * t * t
-        : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const drawBlendedFrame = (ctx, canvas, framesRef, totalFrames, displayProgress) => {
+      const frameFloat = displayProgress * totalFrames;
+      const floorFrame = Math.min(Math.floor(frameFloat), totalFrames - 1);
+      const frac = Math.min(frameFloat - floorFrame, 1);
+      const img0 = framesRef.current[floorFrame];
+      const img1 = frac > 0.01 && floorFrame + 1 < totalFrames ? framesRef.current[floorFrame + 1] : null;
+      const isImageOk = (img) => img && img.complete && img.naturalWidth > 0;
+      if (isImageOk(img0)) {
+        ctx.globalAlpha = 1;
+        ctx.drawImage(img0, 0, 0, canvas.width, canvas.height);
+        if (isImageOk(img1)) {
+          ctx.globalAlpha = frac;
+          ctx.drawImage(img1, 0, 0, canvas.width, canvas.height);
+          ctx.globalAlpha = 1;
+        }
+      }
     };
 
     const updateAnimations = () => {
@@ -74,31 +108,28 @@ export default function Home() {
         const isInView = scrollY + viewportHeight > sectionTop && scrollY < sectionBottom;
 
         if (isInView) {
-          // Start animation when section is 50% into viewport
-          const startScroll = sectionTop - viewportHeight * 0.5;
+          const startScroll = sectionTop - viewportHeight * 1;
           const endScroll = sectionBottom - viewportHeight;
-          let progress = startScroll < endScroll
+          let targetProgress = startScroll < endScroll
             ? (scrollY - startScroll) / (endScroll - startScroll)
             : 0;
-          progress = Math.max(0, Math.min(1, progress));
-          const easedProgress = easeInOutCubic(progress);
+          targetProgress = Math.max(0, Math.min(1, targetProgress));
+          targetProgress = easeInOutCubic(targetProgress);
 
-          setHillScrollProgress(progress);
+          setHillScrollProgress(targetProgress);
 
-          const frameIndex = Math.min(
-            Math.floor(easedProgress * TOTAL_FRAMES),
-            TOTAL_FRAMES - 1
-          );
+          const current = desertCurrentProgressRef.current;
+          const gap = Math.abs(targetProgress - current);
+          const lerpSpeed = getLerpSpeed(gap);
+          desertCurrentProgressRef.current += (targetProgress - current) * lerpSpeed;
+          const displayProgress = desertCurrentProgressRef.current;
 
-          if (frameIndex !== currentFrameRef.current) {
-            const img = desertFramesRef.current[frameIndex];
-            if (img && img.complete) {
-              if (!desertCtxRef.current) {
-                desertCtxRef.current = desertCanvas.getContext("2d", { alpha: false });
-              }
-              desertCtxRef.current.drawImage(img, 0, 0, desertCanvas.width, desertCanvas.height);
-              currentFrameRef.current = frameIndex;
+          if (displayProgress >= 0) {
+            if (!desertCtxRef.current) {
+              desertCtxRef.current = desertCanvas.getContext("2d", { alpha: false });
             }
+            drawBlendedFrame(desertCtxRef.current, desertCanvas, desertFramesRef, TOTAL_FRAMES, Math.min(displayProgress, 1));
+            currentFrameRef.current = Math.floor(displayProgress * TOTAL_FRAMES);
           }
         }
       }
@@ -114,100 +145,195 @@ export default function Home() {
         const isInView = scrollY + viewportHeight > sectionTop && scrollY < sectionBottom;
 
         if (isInView) {
-          let progress = (scrollY - sectionTop) / (sectionHeight - viewportHeight);
-          progress = Math.max(0, Math.min(1, progress));
-          // Lazy easing: gentle ease-out for smooth, slow frame progression
-          const lazyEase = (t) => 1 - Math.pow(1 - t, 1.8);
-          const smoothProgress = lazyEase(progress);
+          let targetProgress = (scrollY - sectionTop) / (sectionHeight - viewportHeight);
+          targetProgress = Math.max(0, Math.min(1, targetProgress));
+          targetProgress = lazyEase(targetProgress);
 
-          const frameIndex = Math.min(
-            Math.floor(smoothProgress * TOTAL_DESSERT_FRAMES),
-            TOTAL_DESSERT_FRAMES - 1
-          );
+          const current = dessertCurrentProgressRef.current;
+          const gap = Math.abs(targetProgress - current);
+          const lerpSpeed = getLerpSpeed(gap);
+          dessertCurrentProgressRef.current += (targetProgress - current) * lerpSpeed;
+          const displayProgress = dessertCurrentProgressRef.current;
 
-          if (frameIndex !== currentDessertFrameRef.current) {
-            const img = dessertFramesRef.current[frameIndex];
-            if (img && img.complete) {
-              if (!dessertCtxRef.current) {
-                dessertCtxRef.current = dessertCanvas.getContext("2d", { alpha: false });
-              }
-              dessertCtxRef.current.drawImage(img, 0, 0, dessertCanvas.width, dessertCanvas.height);
-              currentDessertFrameRef.current = frameIndex;
+          if (displayProgress >= 0) {
+            if (!dessertCtxRef.current) {
+              dessertCtxRef.current = dessertCanvas.getContext("2d", { alpha: false });
             }
+            drawBlendedFrame(dessertCtxRef.current, dessertCanvas, dessertFramesRef, TOTAL_DESSERT_FRAMES, Math.min(displayProgress, 1));
+            currentDessertFrameRef.current = Math.floor(displayProgress * TOTAL_DESSERT_FRAMES);
           }
+        }
+      }
+
+      // Spaceship frames scroll animation - same as dessert: lazy/smooth, progresses slowly with scroll
+      const spaceshipSection = spaceshipSectionRef.current;
+      const spaceshipCanvas = spaceshipCanvasRef.current;
+      if (spaceshipSection && spaceshipCanvas && spaceshipFramesRef.current.length > 0) {
+        const sectionTop = spaceshipSection.offsetTop;
+        const sectionHeight = spaceshipSection.offsetHeight;
+        const sectionBottom = sectionTop + sectionHeight;
+
+        const isInView = scrollY + viewportHeight > sectionTop && scrollY < sectionBottom;
+        const justScrolledPast = scrollY >= sectionBottom && scrollY < sectionBottom + viewportHeight;
+
+        if (isInView) {
+          let targetProgress = (scrollY - sectionTop) / (sectionHeight - viewportHeight);
+          targetProgress = Math.max(0, Math.min(1, targetProgress));
+          targetProgress = lazyEase(targetProgress);
+
+          const current = spaceshipCurrentProgressRef.current;
+          const gap = Math.abs(targetProgress - current);
+          const lerpSpeed = getLerpSpeed(gap);
+          spaceshipCurrentProgressRef.current += (targetProgress - current) * lerpSpeed;
+          const displayProgress = spaceshipCurrentProgressRef.current;
+
+          if (displayProgress >= 0) {
+            if (!spaceshipCtxRef.current) {
+              spaceshipCtxRef.current = spaceshipCanvas.getContext("2d", { alpha: false });
+            }
+            drawBlendedFrame(spaceshipCtxRef.current, spaceshipCanvas, spaceshipFramesRef, TOTAL_SPACESHIP_FRAMES, Math.min(displayProgress, 1));
+            currentSpaceshipFrameRef.current = Math.floor(displayProgress * TOTAL_SPACESHIP_FRAMES);
+          }
+        } else if (justScrolledPast && spaceshipCurrentProgressRef.current > 0.01) {
+          if (!spaceshipCtxRef.current) {
+            spaceshipCtxRef.current = spaceshipCanvas.getContext("2d", { alpha: false });
+          }
+          drawBlendedFrame(spaceshipCtxRef.current, spaceshipCanvas, spaceshipFramesRef, TOTAL_SPACESHIP_FRAMES, 1);
         }
       }
     };
 
+    const tick = () => {
+      updateAnimations();
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
     updateAnimations();
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    rafRef.current = requestAnimationFrame(tick);
+    window.addEventListener("scroll", updateAnimations, { passive: true });
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("scroll", updateAnimations);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
-  // Floating cloud animation loop
+  // Hero cloud positions (approx % from top-left) for push-away from text
+  const heroCloudPositions = [
+    { ref: leftCloudRef, cx: 12, cy: 75 },
+    { ref: rightCloudRef, cx: 88, cy: 75 },
+    { ref: centerCloudRef, cx: 50, cy: 75, center: true },
+    { ref: cloud4Ref, cx: 85, cy: 72 },
+    { ref: cloud5Ref, cx: 28, cy: 72 },
+  ];
+  const heroTextCenter = { x: 22, y: 45 };
+
+  // Floating cloud animation loop - pause when hero out of view to save CPU
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     let animationId;
     let startTime = null;
+    let heroVisible = true;
+    const pushLerpSpeed = 0.04;
+
+    const heroEl = document.getElementById("hero");
+    const heroObs = heroEl ? new IntersectionObserver(([e]) => { heroVisible = e.isIntersecting; }, { threshold: 0 }) : null;
+    if (heroObs && heroEl) heroObs.observe(heroEl);
 
     const animateClouds = (timestamp) => {
+      animationId = requestAnimationFrame(animateClouds);
+      if (!heroVisible) return;
+
       if (!startTime) startTime = timestamp;
       const elapsed = (timestamp - startTime) / 1000;
 
-      // Left cloud - phase 0 (starts going up)
-      if (leftCloudRef.current) {
-        const yOffset = -80 + Math.sin(elapsed * 0.3) * 50;
-        const xOffset = Math.cos(elapsed * 0.2) * 45;
-        leftCloudRef.current.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
-      }
+      const targetPush = heroHoverRef.current ? 50 : 0;
+      heroPushAmountRef.current += (targetPush - heroPushAmountRef.current) * pushLerpSpeed;
 
-      // Right cloud - phase offset by 2π/3 (120°) - different direction
-      if (rightCloudRef.current) {
-        const yOffset = -80 + Math.sin(elapsed * 0.3 + Math.PI * 0.66) * 55;
-        const xOffset = Math.cos(elapsed * 0.22 + Math.PI * 0.5) * 50;
-        rightCloudRef.current.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
-      }
+      const baseOffsets = [
+        { y: -80 + Math.sin(elapsed * 0.3) * 50, x: Math.cos(elapsed * 0.2) * 45 },
+        { y: -80 + Math.sin(elapsed * 0.3 + Math.PI * 0.66) * 55, x: Math.cos(elapsed * 0.22 + Math.PI * 0.5) * 50 },
+        { y: -100 + Math.sin(elapsed * 0.25 + Math.PI * 1.33) * 45, x: Math.cos(elapsed * 0.22 + Math.PI) * 40 },
+        { y: -60 + Math.sin(elapsed * 0.22 + Math.PI * 0.4) * 40, x: Math.cos(elapsed * 0.18 + Math.PI * 0.8) * 35 },
+        { y: -70 + Math.sin(elapsed * 0.2 + Math.PI * 1.8) * 35, x: Math.cos(elapsed * 0.24 + Math.PI * 1.2) * 30 },
+      ];
 
-      // Center cloud - phase offset by 4π/3 (240°) - another different direction
-      if (centerCloudRef.current) {
-        const yOffset = -100 + Math.sin(elapsed * 0.25 + Math.PI * 1.33) * 45;
-        const xOffset = Math.cos(elapsed * 0.22 + Math.PI) * 40;
-        centerCloudRef.current.style.transform = `translate3d(calc(-50% + ${xOffset}px), ${yOffset}px, 0)`;
-      }
+      heroCloudPositions.forEach((pos, i) => {
+        const el = pos.ref?.current;
+        if (!el) return;
 
-      // Cloud 4 - herocloud on bottom right area
-      if (cloud4Ref.current) {
-        const yOffset = -60 + Math.sin(elapsed * 0.22 + Math.PI * 0.4) * 40;
-        const xOffset = Math.cos(elapsed * 0.18 + Math.PI * 0.8) * 35;
-        cloud4Ref.current.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
-      }
+        const dx = pos.cx - heroTextCenter.x;
+        const dy = pos.cy - heroTextCenter.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const pushX = (dx / len) * heroPushAmountRef.current;
+        const pushY = (dy / len) * heroPushAmountRef.current;
 
-      // Cloud 5 - regular cloud on left-center area
-      if (cloud5Ref.current) {
-        const yOffset = -70 + Math.sin(elapsed * 0.2 + Math.PI * 1.8) * 35;
-        const xOffset = Math.cos(elapsed * 0.24 + Math.PI * 1.2) * 30;
-        cloud5Ref.current.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
-      }
+        const base = baseOffsets[i];
+        const totalX = base.x + pushX;
+        const totalY = base.y + pushY;
+
+        if (pos.center) {
+          el.style.transform = `translate3d(calc(-50% + ${totalX}px), ${totalY}px, 0)`;
+        } else {
+          el.style.transform = `translate3d(${totalX}px, ${totalY}px, 0)`;
+        }
+      });
 
       // Header - subtle slow float up and down
       if (headerRef.current) {
         const yOffset = Math.sin(elapsed * 1.2) * 6;
         headerRef.current.style.transform = `translateY(${yOffset}px)`;
       }
-
-      animationId = requestAnimationFrame(animateClouds);
     };
 
     animationId = requestAnimationFrame(animateClouds);
 
     return () => {
       if (animationId) cancelAnimationFrame(animationId);
+      if (heroObs && heroEl) heroObs.disconnect();
     };
+  }, []);
+
+  // Moderate scroll speed in the 2 video frame sections (dessert, spaceship)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const WHEEL_MODIFIER = 0.45;
+    const PIXELS_PER_LINE = 100 / 6;
+
+    const handleWheel = (e) => {
+      const dessert = document.getElementById("section-dessert");
+      const spaceship = document.getElementById("section-spaceship");
+
+      const sections = [dessert, spaceship].filter(Boolean);
+      const scrollY = window.scrollY || window.pageYOffset;
+      const viewportHeight = window.innerHeight;
+
+      const isInVideoSection = sections.some((el) => {
+        const top = el.offsetTop;
+        const bottom = top + el.offsetHeight;
+        return scrollY + viewportHeight > top && scrollY < bottom;
+      });
+
+      if (!isInVideoSection) return;
+
+      let deltaY = e.deltaY;
+      if (e.deltaMode === 1) deltaY *= PIXELS_PER_LINE;
+      else if (e.deltaMode === 2) deltaY *= viewportHeight;
+
+      const maxScroll = document.documentElement.scrollHeight - viewportHeight;
+      const newScroll = Math.max(0, Math.min(maxScroll, scrollY + deltaY * WHEEL_MODIFIER));
+
+      if (Math.abs(deltaY) > 2) {
+        e.preventDefault();
+        window.scrollTo({ top: newScroll, behavior: "auto" });
+      }
+    };
+
+    window.addEventListener("wheel", handleWheel, { passive: false, capture: true });
+
+    return () => window.removeEventListener("wheel", handleWheel, { capture: true });
   }, []);
 
   // Defer frame loading until sections are near viewport (reduces initial load)
@@ -216,6 +342,35 @@ export default function Home() {
 
     let desertLoaded = false;
     let dessertLoaded = false;
+    let spaceshipLoaded = false;
+
+    const loadSpaceshipFrames = () => {
+      if (spaceshipLoaded) return;
+      spaceshipLoaded = true;
+
+      const frames = [];
+      let loadedCount = 0;
+      for (let i = 1; i <= TOTAL_SPACESHIP_FRAMES; i++) {
+        const img = new Image();
+        img.src = `/spaceship-frames/frame_${String(i).padStart(4, "0")}.png`;
+        img.onload = () => {
+          loadedCount++;
+          if (loadedCount === TOTAL_SPACESHIP_FRAMES) setSpaceshipFramesLoaded(true);
+        };
+        frames.push(img);
+      }
+      spaceshipFramesRef.current = frames;
+      const first = frames[0];
+      first.onload = () => {
+        const canvas = spaceshipCanvasRef.current;
+        if (canvas && first.complete) {
+          canvas.width = first.naturalWidth;
+          canvas.height = first.naturalHeight;
+          const ctx = canvas.getContext("2d", { alpha: false });
+          ctx?.drawImage(first, 0, 0, canvas.width, canvas.height);
+        }
+      };
+    };
 
     const loadDesertFrames = () => {
       if (desertLoaded) return;
@@ -279,6 +434,7 @@ export default function Home() {
           if (!entry.isIntersecting) return;
           if (entry.target.id === "section-hill") loadDesertFrames();
           if (entry.target.id === "section-dessert") loadDessertFrames();
+          if (entry.target.id === "section-spaceship") loadSpaceshipFrames();
         });
       },
       { rootMargin: "400px", threshold: 0 }
@@ -286,8 +442,10 @@ export default function Home() {
 
     const hill = document.getElementById("section-hill");
     const dessert = document.getElementById("section-dessert");
+    const spaceship = document.getElementById("section-spaceship");
     if (hill) observer.observe(hill);
     if (dessert) observer.observe(dessert);
+    if (spaceship) observer.observe(spaceship);
 
     return () => observer.disconnect();
   }, []);
@@ -407,8 +565,12 @@ export default function Home() {
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: "url(/herobg.jpg)" }}
         />
-        <div className="absolute inset-0 z-0 flex items-center px-6 sm:px-8 md:px-16 lg:px-24">
-          <div className="text-left">
+        <div
+          className="absolute inset-0 z-0 flex cursor-pointer items-center px-6 sm:px-8 md:px-16 lg:px-24"
+          onMouseEnter={() => { heroHoverRef.current = true; }}
+          onMouseLeave={() => { heroHoverRef.current = false; }}
+        >
+          <div className="text-left cursor-pointer">
             <p className="text-lg text-white/80 md:text-xl">Hi, I am</p>
             <h1 className="text-5xl font-bold text-white md:text-7xl lg:text-8xl">
               Abhishek R
@@ -461,7 +623,7 @@ export default function Home() {
       <section
         ref={dessertSectionRef}
         id="section-dessert"
-        className="relative"
+        className="relative cursor-pointer"
         style={{ height: "300vh" }}
       >
         <div className="sticky top-0 h-screen w-full overflow-hidden">
@@ -477,6 +639,23 @@ export default function Home() {
       {/* Terminal About section */}
       <AboutTerminal />
 
+      {/* Spaceship scroll animation section - before Skills */}
+      <section
+        ref={spaceshipSectionRef}
+        id="section-spaceship"
+        className="relative cursor-pointer bg-black"
+        style={{ height: "300vh" }}
+      >
+        <div className="sticky top-0 h-screen w-full overflow-hidden bg-black">
+          <canvas
+            ref={spaceshipCanvasRef}
+            className="h-full w-full object-cover"
+            style={{ display: "block" }}
+          />
+          <SpaceshipAbout />
+        </div>
+      </section>
+
       <section
         id="section-4"
         className="relative h-screen min-h-screen overflow-hidden bg-white"
@@ -489,10 +668,10 @@ export default function Home() {
       {/* EEG Signal Processing Section */}
       <section
         id="section-signal"
-        className="relative"
-        style={{ 
-          height: "100vh", 
-          minHeight: "100vh", 
+        className="group relative overflow-hidden transition-[background-image] duration-500"
+        style={{
+          height: "100vh",
+          minHeight: "100vh",
           background: "#080810",
           backgroundImage: `
             linear-gradient(rgba(100, 150, 255, 0.08) 1px, transparent 1px),
@@ -501,15 +680,49 @@ export default function Home() {
           backgroundSize: "50px 50px"
         }}
       >
-        {/* Top 70% - Text area */}
+        {/* Subtle neural pulse overlay on hover */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+          style={{
+            background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(34, 211, 238, 0.06) 0%, transparent 60%)",
+          }}
+        />
+        {/* Floating neural dots background */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {[...Array(12)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute rounded-full bg-cyan-500/20 group-hover:bg-cyan-400/40 group-hover:scale-125 transition-all duration-500"
+              style={{
+                width: 4 + (i % 3) * 2,
+                height: 4 + (i % 3) * 2,
+                left: `${10 + (i * 7) % 80}%`,
+                top: `${15 + (i * 11) % 70}%`,
+                animation: `float-dot ${8 + (i % 5)}s ease-in-out infinite`,
+                animationDelay: `${-i * 0.8}s`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Top 70% - Text area in glass card */}
         <div className="absolute top-0 left-0 right-0 flex items-center justify-center px-4 sm:px-6 md:px-8" style={{ height: "70%" }}>
-          <div className="max-w-3xl space-y-3 sm:space-y-4 text-left">
-            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/90 leading-relaxed">
-              I&apos;ve developed multiple systems involving preprocessing, denoising frameworks, feature extraction, and benchmarking pipelines using both classical and deep learning approaches. My specialization lies in signal processing, EEG denoising methods, and evaluating robust machine learning pipelines for neural decoding.
-            </p>
-            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/90 leading-relaxed">
-              These projects are part of a larger journey of learning, experimenting, and building toward something much bigger in the BCI space… stay tuned 😉
-            </p>
+          <div
+            className="relative max-w-3xl rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-5 sm:px-8 sm:py-6 shadow-xl group-hover:border-cyan-500/30 group-hover:shadow-[0_0_60px_-15px_rgba(34,211,238,0.25),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-500"
+            style={{
+              boxShadow: "0 0 40px -10px rgba(100, 150, 255, 0.15), inset 0 1px 0 rgba(255,255,255,0.05)",
+              animation: "float-card 6s ease-in-out infinite",
+            }}
+          >
+            <h3 className="text-xs font-semibold tracking-widest text-cyan-400/90 uppercase mb-4">BCI & Signal Processing</h3>
+            <div className="space-y-3 sm:space-y-4 text-left">
+              <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/90 leading-relaxed">
+                I&apos;ve developed multiple systems involving preprocessing, denoising frameworks, feature extraction, and benchmarking pipelines using both classical and deep learning approaches. My specialization lies in signal processing, EEG denoising methods, and evaluating robust machine learning pipelines for neural decoding.
+              </p>
+              <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/90 leading-relaxed">
+                These projects are part of a larger journey of learning, experimenting, and building toward something much bigger in the BCI space… stay tuned 😉
+              </p>
+            </div>
           </div>
         </div>
         {/* Bottom 30% - Signal visualization */}
@@ -522,7 +735,7 @@ export default function Home() {
       <section
         ref={desertSectionRef}
         id="section-hill"
-        className="relative"
+        className="relative cursor-pointer"
         style={{ height: "300vh" }}
       >
         <div className="sticky top-0 h-screen w-full overflow-hidden">
@@ -540,7 +753,6 @@ export default function Home() {
 
       {/* Contact */}
       <ContactSection />
-
     </main>
   );
 }

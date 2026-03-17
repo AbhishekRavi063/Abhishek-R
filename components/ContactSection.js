@@ -1,5 +1,20 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
+const CLOUDS = [
+  { src: "/herocloud.png", opacity: 0.38, scale: 1.4, x: "5%", y: "15%", phase: 0 },
+  { src: "/cloud.png", opacity: 0.35, scale: 1.6, x: "75%", y: "20%", phase: 0.66 },
+  { src: "/cloud.png", opacity: 0.32, scale: 1.3, x: "15%", y: "70%", phase: 1.33 },
+  { src: "/herocloud.png", opacity: 0.36, scale: 1.5, x: "80%", y: "65%", phase: 2 },
+  { src: "/cloud.png", opacity: 0.28, scale: 1.2, x: "50%", y: "85%", phase: 0.5 },
+  { src: "/herocloud.png", opacity: 0.3, scale: 1.35, x: "40%", y: "10%", phase: 1.8 },
+  { src: "/cloud.png", opacity: 0.25, scale: 1.15, x: "90%", y: "45%", phase: 1.1 },
+  { src: "/herocloud.png", opacity: 0.33, scale: 1.25, x: "8%", y: "45%", phase: 2.2 },
+  { src: "/cloud.png", opacity: 0.3, scale: 1.4, x: "60%", y: "75%", phase: 0.3 },
+  { src: "/herocloud.png", opacity: 0.27, scale: 1.2, x: "25%", y: "35%", phase: 1.6 },
+];
+
 const CONTACTS = [
   { href: "https://wa.me/918281540004", label: "WhatsApp", icon: "wa", color: "#25D366" },
   { href: "mailto:abhishekravi063@gmail.com", label: "Email", icon: "mail", color: "#22d3ee" },
@@ -8,6 +23,60 @@ const CONTACTS = [
 ];
 
 export default function ContactSection() {
+  const contactRef = useRef(null);
+  const cloudRefs = useRef([]);
+  const hoverRef = useRef(false);
+  const pushAmountRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let startTime = null;
+    let rafId;
+    const pushLerpSpeed = 0.035;
+
+    const animate = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = (timestamp - startTime) / 1000;
+
+      if (contactRef.current) {
+        const yOffset = Math.sin(elapsed * 0.9) * 8;
+        const xOffset = Math.sin(elapsed * 0.6 + 0.5) * 4;
+        contactRef.current.style.transform = `translate(${xOffset}px, ${yOffset}px)`;
+      }
+
+      const targetPush = hoverRef.current ? 40 : 0;
+      pushAmountRef.current += (targetPush - pushAmountRef.current) * pushLerpSpeed;
+
+      CLOUDS.forEach((cloud, i) => {
+        const el = cloudRefs.current[i];
+        if (el) {
+          const cx = parseInt(cloud.x, 10) || 50;
+          const cy = parseInt(cloud.y, 10) || 50;
+          const dx = cx - 50;
+          const dy = cy - 50;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const pushX = (dx / len) * pushAmountRef.current;
+          const pushY = (dy / len) * pushAmountRef.current;
+
+          const yOffset = Math.sin(elapsed * 0.35 + cloud.phase * Math.PI) * 25;
+          const xOffset = Math.cos(elapsed * 0.28 + cloud.phase * 0.7) * 20;
+          const totalX = xOffset + pushX;
+          const totalY = yOffset + pushY;
+          el.style.transform = `translate(calc(-50% + ${totalX}px), calc(-50% + ${totalY}px)) scale(${cloud.scale})`;
+        }
+      });
+
+      rafId = requestAnimationFrame(animate);
+    };
+
+    rafId = requestAnimationFrame(animate);
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   return (
     <section
       id="contact"
@@ -18,8 +87,36 @@ export default function ContactSection() {
         style={{ backgroundImage: "url(/fogforest.jpg)" }}
       />
 
-      {/* Glassy div with socials */}
-      <div className="relative z-10 px-4 sm:px-6 md:px-8 py-4 sm:py-6 rounded-2xl sm:rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl cursor-pointer transition-shadow duration-700 ease-in-out hover:shadow-[0_0_0_2px_rgba(255,255,255,0.4),0_0_25px_rgba(255,255,255,0.2),0_0_50px_rgba(255,255,255,0.1)] mx-4 sm:mx-6">
+      {/* Floating clouds layer - behind contact div */}
+      <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
+        {CLOUDS.map((cloud, i) => (
+          <img
+            key={`${cloud.src}-${i}`}
+            ref={(el) => { cloudRefs.current[i] = el; }}
+            src={cloud.src}
+            alt=""
+            loading="lazy"
+            className="absolute object-contain"
+            style={{
+              left: cloud.x,
+              top: cloud.y,
+              opacity: cloud.opacity,
+              maxWidth: "45%",
+              maxHeight: "50%",
+              willChange: "transform",
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Glassy div with socials - floating animation, above clouds */}
+      <div
+        ref={contactRef}
+        onMouseEnter={() => { hoverRef.current = true; }}
+        onMouseLeave={() => { hoverRef.current = false; }}
+        className="relative z-20 px-4 sm:px-6 md:px-8 py-4 sm:py-6 rounded-2xl sm:rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl cursor-pointer transition-shadow duration-700 ease-in-out hover:shadow-[0_0_0_2px_rgba(255,255,255,0.4),0_0_25px_rgba(255,255,255,0.2),0_0_50px_rgba(255,255,255,0.1)] mx-4 sm:mx-6"
+        style={{ willChange: "transform" }}
+      >
         <div className="flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
           {CONTACTS.map((c) => (
             <a

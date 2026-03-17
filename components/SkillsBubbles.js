@@ -12,6 +12,7 @@ const SKILLS = [
   { name: "FastAPI", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/fastapi/fastapi-original.svg" },
   { name: "MongoDB", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg" },
   { name: "PostgreSQL", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg" },
+  { name: "Neon", logo: "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 32 32"><path fill="#34D59A" d="M27.54 2V28l-10.75-9.5v9.32H0V0zM3.38 24.4h10.04V11.1l10.75 9.5V3.38L3.38 3.38z"/></svg>') },
   { name: "AWS", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original-wordmark.svg" },
   { name: "Docker", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg" },
   { name: "Three.js", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/threejs/threejs-original.svg" },
@@ -19,6 +20,8 @@ const SKILLS = [
   { name: "PyTorch", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/pytorch/pytorch-original.svg" },
   { name: "HTML", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/html5/html5-original.svg" },
   { name: "CSS", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/css3/css3-original.svg" },
+  { name: "Tailwind CSS", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-original.svg" },
+  { name: "Figma", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/figma/figma-original.svg" },
   { name: "Cloudflare", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/cloudflare/cloudflare-original.svg" },
   { name: "Supabase", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/supabase/supabase-original.svg" },
   { name: "Firebase", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/firebase/firebase-plain.svg" },
@@ -52,7 +55,7 @@ export default function SkillsBubbles() {
         isVisibleRef.current = entry.isIntersecting;
         if (entry.isIntersecting) setIsVisible(true);
       },
-      { threshold: 0, rootMargin: "100px" }
+      { threshold: 0, rootMargin: "200px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -73,7 +76,8 @@ export default function SkillsBubbles() {
 
       const width = container.offsetWidth;
       const height = container.offsetHeight;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const isMobileDevice = width < 640;
+      const dpr = isMobileDevice ? Math.min(window.devicePixelRatio || 1, 2) : Math.min(window.devicePixelRatio || 1, 2);
 
       canvas.width = width * dpr;
       canvas.height = height * dpr;
@@ -81,7 +85,9 @@ export default function SkillsBubbles() {
       canvas.style.height = `${height}px`;
 
       const ctx = canvas.getContext("2d");
-      ctx.scale(dpr, dpr);
+      if (dpr > 1) ctx.scale(dpr, dpr);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
 
       const engine = Matter.Engine.create({
         gravity: { x: 0, y: 0 },
@@ -191,23 +197,26 @@ export default function SkillsBubbles() {
         Matter.Composite.add(engine.world, letterBodies);
       }
 
-      const baseRadius = isMobile ? Math.min(width, height) * 0.065 : Math.min(width, height) * 0.04;
+      const baseRadius = isMobile ? Math.min(width, height) * 0.06 : Math.min(width, height) * 0.04;
+      const skillsToShow = isMobile ? SKILLS.slice(0, 14) : SKILLS;
 
-      const bubbles = SKILLS.map((skill) => {
+      const bubbles = skillsToShow.map((skill) => {
         const textLen = skill.name.length;
-        const radius = baseRadius + textLen * 1 + Math.random() * 4;
+        const radius = isMobile
+          ? Math.max(baseRadius + textLen * 1.4, baseRadius + 8)
+          : baseRadius + textLen * 0.5 + Math.random() * 3;
         const x = radius + Math.random() * (width - radius * 2);
         const y = radius + Math.random() * (height * 0.5);
 
         const body = Matter.Bodies.circle(x, y, radius, {
-          restitution: 0.85,
-          friction: 0,
-          frictionAir: 0.001,
+          restitution: 0.92,
+          friction: 0.001,
+          frictionAir: 0.002,
           label: skill.name,
         });
 
         const angle = Math.random() * Math.PI * 2;
-        const speed = 0.12 + Math.random() * 0.1;
+        const speed = 0.08 + Math.random() * 0.06;
         Matter.Body.setVelocity(body, { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed });
         body.skill = skill;
         body.radius = radius;
@@ -266,8 +275,8 @@ export default function SkillsBubbles() {
       const handleMouseUp = () => {
         if (draggedBodyRef.current) {
           Matter.Body.setStatic(draggedBodyRef.current, false);
-          const vx = (Math.random() - 0.5) * 1.2;
-          const vy = (Math.random() - 0.5) * 1.2;
+          const vx = (Math.random() - 0.5) * 0.7;
+          const vy = (Math.random() - 0.5) * 0.7;
           Matter.Body.setVelocity(draggedBodyRef.current, { x: vx, y: vy });
         }
         mouseRef.current.isDown = false;
@@ -279,26 +288,44 @@ export default function SkillsBubbles() {
       canvas.addEventListener("mouseleave", handleMouseUp);
       window.addEventListener("mousemove", handleMouseMove);
 
-      const minSpeed = 0.1;
+      const minSpeed = 0.06;
 
-      const render = () => {
-        Matter.Engine.update(engine, 1000 / 60);
+      let lastFrameTime = performance.now();
+      const targetFps = isMobile ? 30 : 60;
+      const frameInterval = 1000 / targetFps;
+
+      const render = (timestamp) => {
+        const now = timestamp ?? performance.now();
+        if (isMobile && now - lastFrameTime < frameInterval) {
+          if (isVisibleRef.current) rafRef.current = requestAnimationFrame(render);
+          else rafRef.current = null;
+          return;
+        }
+        if (isMobile) lastFrameTime = now;
+
+        Matter.Engine.update(engine, 1000 / targetFps);
 
         spinnerAngle += spinnerSpeed;
 
         const mx = mouseRef.current.x;
         const my = mouseRef.current.y;
-        bubbles.forEach((body) => {
+        const floatPhase = performance.now() * 0.0008;
+        bubbles.forEach((body, i) => {
           if (body.isStatic) return;
+
+          const driftPhase = floatPhase + i * 0.7;
+          const driftX = Math.sin(driftPhase) * 0.00015;
+          const driftY = Math.cos(driftPhase * 0.9) * -0.00012;
+          Matter.Body.applyForce(body, body.position, { x: driftX, y: driftY });
 
           const dx = body.position.x - mx;
           const dy = body.position.y - my;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 150 && dist > 0) {
-            const force = 0.0006 * (150 - dist);
+          if (dist < 140 && dist > 0) {
+            const softForce = 0.00025 * (140 - dist);
             Matter.Body.applyForce(body, body.position, {
-              x: (dx / dist) * force,
-              y: (dy / dist) * force,
+              x: (dx / dist) * softForce,
+              y: (dy / dist) * softForce,
             });
           }
 
@@ -309,16 +336,16 @@ export default function SkillsBubbles() {
             const hitRadius = spinner.radius + body.radius;
 
             if (sDist < hitRadius && sDist > 0) {
-              spinnerSpeed = Math.min(0.12, spinnerSpeed + 0.008);
+              spinnerSpeed = Math.min(0.1, spinnerSpeed + 0.006);
 
               const throwAngle = spinner.rotation * spinnerAngle + Math.PI / 2;
-              const throwSpeed = 3 + spinnerSpeed * 35;
+              const throwSpeed = 1.8 + spinnerSpeed * 25;
               Matter.Body.setVelocity(body, {
                 x: Math.cos(throwAngle) * throwSpeed,
                 y: Math.sin(throwAngle) * throwSpeed,
               });
 
-              const pushOut = hitRadius - sDist + 5;
+              const pushOut = hitRadius - sDist + 4;
               Matter.Body.setPosition(body, {
                 x: body.position.x + (sdx / sDist) * pushOut,
                 y: body.position.y + (sdy / sDist) * pushOut,
@@ -336,7 +363,7 @@ export default function SkillsBubbles() {
           }
         });
 
-        spinnerSpeed = Math.max(0.02, spinnerSpeed * 0.995);
+        spinnerSpeed = Math.max(0.03, spinnerSpeed * 0.998);
 
         ctx.clearRect(0, 0, width, height);
 
@@ -345,7 +372,7 @@ export default function SkillsBubbles() {
         ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        if (isMobile) ctx.globalAlpha = 0.35;
+        if (isMobile) ctx.globalAlpha = 0.5;
 
         letterVisuals.forEach((lv) => {
           // Crystal/glass base with visible fill
@@ -449,72 +476,75 @@ export default function SkillsBubbles() {
           ctx.save();
           ctx.translate(x, y);
 
-          if (isMobile) {
-            ctx.beginPath();
-            ctx.arc(0, 0, r, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-            ctx.fill();
-            ctx.strokeStyle = "rgba(0, 0, 0, 0.08)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          } else {
-            const gradient = ctx.createRadialGradient(0, -r * 0.3, 0, 0, 0, r);
-            gradient.addColorStop(0, "rgba(255, 255, 255, 0.95)");
-            gradient.addColorStop(0.5, "rgba(240, 240, 245, 0.9)");
-            gradient.addColorStop(1, "rgba(220, 225, 235, 0.85)");
-            ctx.beginPath();
-            ctx.arc(0, 0, r, 0, Math.PI * 2);
-            ctx.fillStyle = gradient;
-            ctx.fill();
-            ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
-            ctx.shadowBlur = 12;
-            ctx.shadowOffsetY = 4;
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.shadowColor = "transparent";
-            ctx.beginPath();
-            ctx.arc(-r * 0.25, -r * 0.3, r * 0.15, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
-            ctx.fill();
-          }
+          const gradient = ctx.createRadialGradient(0, -r * 0.3, 0, 0, 0, r);
+          gradient.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+          gradient.addColorStop(0.5, "rgba(240, 240, 245, 0.9)");
+          gradient.addColorStop(1, "rgba(220, 225, 235, 0.85)");
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.fillStyle = gradient;
+          ctx.fill();
+          ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
+          ctx.shadowBlur = isMobile ? 6 : 12;
+          ctx.shadowOffsetY = isMobile ? 2 : 4;
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+          ctx.lineWidth = isMobile ? 1.5 : 2;
+          ctx.stroke();
+          ctx.shadowColor = "transparent";
+          ctx.beginPath();
+          ctx.arc(-r * 0.25, -r * 0.3, r * 0.15, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+          ctx.fill();
 
-          const logoMaxSize = isMobile ? Math.max(r * 0.65, 20) : r * 0.55;
+          const innerPad = isMobile ? 8 : 6;
+          const contentRadius = r - innerPad;
+          const logoMaxSize = isMobile
+            ? Math.min(contentRadius * 0.5, Math.max(20, contentRadius * 0.45))
+            : r * 0.55;
+          const logoYOffset = -contentRadius * 0.28;
+          let logoHeight = logoMaxSize;
           const img = loadedImages[skill.logo];
           if (img && img.complete && img.naturalWidth > 0) {
             const aspectRatio = img.naturalWidth / img.naturalHeight;
-            let logoWidth, logoHeight;
+            let logoWidth;
             if (aspectRatio > 1) {
-              // Wider than tall
               logoWidth = logoMaxSize;
               logoHeight = logoMaxSize / aspectRatio;
             } else {
-              // Taller than wide or square
               logoHeight = logoMaxSize;
               logoWidth = logoMaxSize * aspectRatio;
             }
             const logoX = -logoWidth / 2;
-            const logoY = -r * 0.3 + (logoMaxSize - logoHeight) / 2;
+            const logoY = logoYOffset;
             ctx.drawImage(img, logoX, logoY, logoWidth, logoHeight);
           }
 
-          ctx.fillStyle = isMobile ? "#0f0f1a" : "#1a1a2e";
-          const fontSize = isMobile ? Math.max(r * 0.25, 9) : r * 0.26;
-          ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
+          const textGap = isMobile ? 6 : 5;
+          const textY = logoYOffset + logoHeight + textGap;
+          const halfChord = Math.sqrt(Math.max(0, contentRadius * contentRadius - textY * textY));
+          const maxTextWidth = Math.max(20, 2 * halfChord * 0.95);
+
+          ctx.fillStyle = "#1a1a2e";
+          let textFontSize = isMobile ? Math.max(10, Math.min(14, contentRadius * 0.3)) : r * 0.26;
+          ctx.font = `600 ${textFontSize}px system-ui, -apple-system, sans-serif`;
+          let measured = ctx.measureText(skill.name);
+          while (measured.width > maxTextWidth && textFontSize > 8) {
+            textFontSize -= 1;
+            ctx.font = `600 ${textFontSize}px system-ui, -apple-system, sans-serif`;
+            measured = ctx.measureText(skill.name);
+          }
           ctx.textAlign = "center";
           ctx.textBaseline = "top";
-          const textY = -r * 0.3 + logoMaxSize + 6;
-          if (isMobile) {
-            const maxTextWidth = r * 1.4;
-            ctx.fillText(skill.name, 0, textY, maxTextWidth);
-          } else {
-            ctx.fillText(skill.name, 0, textY);
-          }
+          ctx.fillText(skill.name, 0, textY, maxTextWidth);
 
           ctx.restore();
         });
 
-        if (isVisibleRef.current) rafRef.current = requestAnimationFrame(render);
+        if (isVisibleRef.current) {
+          rafRef.current = requestAnimationFrame(render);
+        } else {
+          rafRef.current = null;
+        }
       };
       renderFnRef.current = render;
 
@@ -523,7 +553,7 @@ export default function SkillsBubbles() {
         if (isVisibleRef.current && !rafRef.current && renderFnRef.current) {
           renderFnRef.current();
         }
-      }, 300);
+      }, 150);
 
       render();
 

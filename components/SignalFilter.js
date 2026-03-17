@@ -319,44 +319,70 @@ export default function SignalFilter() {
     };
   }, [isVisible, lowCut, highCut]);
 
+  const presets = [
+    { label: "Alpha", hp: 8, lp: 13, hint: "8–13 Hz · relaxation" },
+    { label: "Beta", hp: 13, lp: 30, hint: "13–30 Hz · focus" },
+    { label: "Theta", hp: 4, lp: 8, hint: "4–8 Hz · meditation" },
+    { label: "Full", hp: 0.5, lp: 40, hint: "0.5–40 Hz · broadband" },
+  ];
+
   return (
     <div className="flex flex-col h-full w-full">
-      {/* Controls */}
-      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 md:gap-8 px-2 sm:px-3 py-2">
-        {/* High-Pass */}
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-cyan-400 font-medium">HP</span>
-          <input
-            type="range"
-            min="0.1"
-            max="10"
-            step="0.1"
-            value={lowCut}
-            onChange={(e) => setLowCut(parseFloat(e.target.value))}
-            className="w-20 md:w-28 cursor-pointer"
-            style={{
-              background: `linear-gradient(to right, rgb(34, 211, 238) 0%, rgb(34, 211, 238) ${(lowCut / 10) * 100}%, rgba(255,255,255,0.15) ${(lowCut / 10) * 100}%, rgba(255,255,255,0.15) 100%)`
-            }}
-          />
-          <span className="text-xs text-cyan-300 font-mono w-14">{lowCut.toFixed(1)} Hz</span>
+      {/* Preset buttons + Controls */}
+      <div className="flex flex-col gap-3 px-3 sm:px-4 py-2">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+          {presets.map((p) => {
+            const isActive = Math.abs(lowCut - p.hp) < 0.3 && Math.abs(highCut - p.lp) < 1;
+            return (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => { setLowCut(p.hp); setHighCut(p.lp); }}
+                className={`cursor-pointer px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-all duration-200 ${
+                  isActive
+                    ? "bg-cyan-500/30 text-cyan-200 border border-cyan-400/50"
+                    : "bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white/80 hover:border-white/20"
+                }`}
+                title={p.hint}
+              >
+                {p.label}
+              </button>
+            );
+          })}
         </div>
-
-        {/* Low-Pass */}
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-blue-400 font-medium">LP</span>
-          <input
-            type="range"
-            min="10"
-            max="100"
-            step="1"
-            value={highCut}
-            onChange={(e) => setHighCut(parseFloat(e.target.value))}
-            className="w-20 md:w-28 cursor-pointer"
-            style={{
-              background: `linear-gradient(to right, rgb(96, 165, 250) 0%, rgb(96, 165, 250) ${((highCut - 10) / 90) * 100}%, rgba(255,255,255,0.15) ${((highCut - 10) / 90) * 100}%, rgba(255,255,255,0.15) 100%)`
-            }}
-          />
-          <span className="text-xs text-blue-300 font-mono w-12">{highCut} Hz</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 md:gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-cyan-400 font-medium">HP</span>
+            <input
+              type="range"
+              min="0.1"
+              max="20"
+              step="0.1"
+              value={lowCut}
+              onChange={(e) => setLowCut(parseFloat(e.target.value))}
+              className="w-20 md:w-28 cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, rgb(34, 211, 238) 0%, rgb(34, 211, 238) ${(lowCut / 20) * 100}%, rgba(255,255,255,0.15) ${(lowCut / 20) * 100}%, rgba(255,255,255,0.15) 100%)`
+              }}
+            />
+            <span className="text-xs text-cyan-300 font-mono w-14">{lowCut.toFixed(1)} Hz</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-blue-400 font-medium">LP</span>
+            <input
+              type="range"
+              min="5"
+              max="100"
+              step="1"
+              value={highCut}
+              onChange={(e) => setHighCut(parseFloat(e.target.value))}
+              className="w-20 md:w-28 cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, rgb(96, 165, 250) 0%, rgb(96, 165, 250) ${((highCut - 5) / 95) * 100}%, rgba(255,255,255,0.15) ${((highCut - 5) / 95) * 100}%, rgba(255,255,255,0.15) 100%)`
+              }}
+            />
+            <span className="text-xs text-blue-300 font-mono w-12">{highCut} Hz</span>
+          </div>
         </div>
       </div>
 

@@ -1,12 +1,25 @@
 @import "tailwindcss";
 
-html {
-  scroll-behavior: smooth;
+/* Lenis smooth scroll - overrides native scroll */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overflow: hidden;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
 }
 
 html,
 body {
-  scroll-behavior: smooth;
   background: #ffffff;
   color: #000000;
   font-family: ui-sans-serif, system-ui, sans-serif;
@@ -74,6 +87,18 @@ input[type="range"]::-moz-range-track {
 @keyframes float-gentle {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
+}
+
+@keyframes float-dot {
+  0%, 100% { transform: translate(0, 0); opacity: 0.2; }
+  25% { transform: translate(8px, -6px); opacity: 0.35; }
+  50% { transform: translate(-4px, 4px); opacity: 0.25; }
+  75% { transform: translate(6px, 8px); opacity: 0.3; }
+}
+
+@keyframes float-card {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 .animate-float-gentle {
