@@ -97,21 +97,18 @@ export default function Home() {
         const isInView = scrollY + viewportHeight > sectionTop && scrollY < sectionBottom;
 
         if (isInView) {
-          const startScroll = sectionTop - viewportHeight * 1;
+          const startScroll = sectionTop - viewportHeight;
           const endScroll = sectionBottom - viewportHeight;
-          let targetProgress = startScroll < endScroll
-            ? (scrollY - startScroll) / (endScroll - startScroll)
-            : 0;
-          targetProgress = Math.max(0, Math.min(1, targetProgress));
-          targetProgress = easeInOutCubic(targetProgress);
-
-          setHillScrollProgress(targetProgress);
+          const scrollRange = Math.max(1, endScroll - startScroll);
+          let targetProgress = (scrollY - startScroll) / scrollRange;
+          targetProgress = Math.max(0, Math.min(1, easeInOutCubic(targetProgress)));
 
           const current = desertCurrentProgressRef.current;
           const gap = Math.abs(targetProgress - current);
-          const lerpSpeed = getLerpSpeed(gap);
-          desertCurrentProgressRef.current += (targetProgress - current) * lerpSpeed;
+          desertCurrentProgressRef.current += (targetProgress - current) * getLerpSpeed(gap);
           const displayProgress = desertCurrentProgressRef.current;
+
+          setHillScrollProgress(displayProgress);
 
           if (displayProgress >= 0) {
             if (!desertCtxRef.current) {
