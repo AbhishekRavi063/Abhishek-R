@@ -45,7 +45,8 @@ export default function ContactSection() {
         contactRef.current.style.transform = `translate(${xOffset}px, ${yOffset}px)`;
       }
 
-      const targetPush = hoverRef.current ? 40 : 0;
+      const isDesktop = typeof window !== "undefined" && window.innerWidth >= 640;
+      const targetPush = isDesktop && hoverRef.current ? 40 : 0;
       pushAmountRef.current += (targetPush - pushAmountRef.current) * pushLerpSpeed;
 
       CLOUDS.forEach((cloud, i) => {
@@ -114,7 +115,7 @@ export default function ContactSection() {
         ref={contactRef}
         onMouseEnter={() => { hoverRef.current = true; }}
         onMouseLeave={() => { hoverRef.current = false; }}
-        className="relative z-20 px-4 sm:px-6 md:px-8 py-4 sm:py-6 rounded-2xl sm:rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl cursor-pointer transition-shadow duration-700 ease-in-out hover:shadow-[0_0_0_2px_rgba(255,255,255,0.4),0_0_25px_rgba(255,255,255,0.2),0_0_50px_rgba(255,255,255,0.1)] mx-4 sm:mx-6"
+        className="relative z-20 px-4 sm:px-6 md:px-8 py-4 sm:py-6 rounded-2xl sm:rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl cursor-pointer transition-shadow duration-700 ease-in-out mx-4 sm:mx-6 sm:hover:shadow-[0_0_0_2px_rgba(255,255,255,0.4),0_0_25px_rgba(255,255,255,0.2),0_0_50px_rgba(255,255,255,0.1)]"
         style={{ willChange: "transform" }}
       >
         <div className="flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
@@ -124,7 +125,7 @@ export default function ContactSection() {
               href={c.href}
               target={c.icon !== "mail" ? "_blank" : undefined}
               rel={c.icon !== "mail" ? "noopener noreferrer" : undefined}
-              className="flex items-center justify-center p-2 sm:p-3 rounded-xl transition-all duration-300 hover:bg-white/10 hover:scale-110 cursor-pointer"
+              className="flex items-center justify-center p-2 sm:p-3 rounded-xl transition-all duration-300 sm:hover:bg-white/10 sm:hover:scale-110 cursor-pointer"
               aria-label={c.label}
             >
               {c.icon === "wa" && (

@@ -6,7 +6,6 @@ import ProjectsShowcase from "@/components/ProjectsShowcase";
 import ContactSection from "@/components/ContactSection";
 import ExperienceTimeline from "@/components/ExperienceTimeline";
 import DessertAbout from "@/components/DessertAbout";
-import SpaceshipAbout from "@/components/SpaceshipAbout";
 import AboutTerminal from "@/components/AboutTerminal";
 const SkillsBubbles = dynamic(() => import("@/components/SkillsBubbles"), { ssr: false });
 const SignalFilter = dynamic(() => import("@/components/SignalFilter"), { ssr: false });
@@ -35,14 +34,6 @@ export default function Home() {
   const currentDessertFrameRef = useRef(-1);
   const [dessertFramesLoaded, setDessertFramesLoaded] = useState(false);
 
-  // Spaceship scroll animation (before skills)
-  const spaceshipSectionRef = useRef(null);
-  const spaceshipCanvasRef = useRef(null);
-  const spaceshipFramesRef = useRef([]);
-  const spaceshipCtxRef = useRef(null);
-  const currentSpaceshipFrameRef = useRef(-1);
-  const [spaceshipFramesLoaded, setSpaceshipFramesLoaded] = useState(false);
-
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -52,12 +43,10 @@ export default function Home() {
 
   const TOTAL_FRAMES = 150;
   const TOTAL_DESSERT_FRAMES = 130;
-  const TOTAL_SPACESHIP_FRAMES = 240;
   const rafRef = useRef(null);
   const [hillScrollProgress, setHillScrollProgress] = useState(0);
   const desertCurrentProgressRef = useRef(0);
   const dessertCurrentProgressRef = useRef(0);
-  const spaceshipCurrentProgressRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -165,42 +154,6 @@ export default function Home() {
         }
       }
 
-      // Spaceship frames scroll animation - same as dessert: lazy/smooth, progresses slowly with scroll
-      const spaceshipSection = spaceshipSectionRef.current;
-      const spaceshipCanvas = spaceshipCanvasRef.current;
-      if (spaceshipSection && spaceshipCanvas && spaceshipFramesRef.current.length > 0) {
-        const sectionTop = spaceshipSection.offsetTop;
-        const sectionHeight = spaceshipSection.offsetHeight;
-        const sectionBottom = sectionTop + sectionHeight;
-
-        const isInView = scrollY + viewportHeight > sectionTop && scrollY < sectionBottom;
-        const justScrolledPast = scrollY >= sectionBottom && scrollY < sectionBottom + viewportHeight;
-
-        if (isInView) {
-          let targetProgress = (scrollY - sectionTop) / (sectionHeight - viewportHeight);
-          targetProgress = Math.max(0, Math.min(1, targetProgress));
-          targetProgress = lazyEase(targetProgress);
-
-          const current = spaceshipCurrentProgressRef.current;
-          const gap = Math.abs(targetProgress - current);
-          const lerpSpeed = getLerpSpeed(gap);
-          spaceshipCurrentProgressRef.current += (targetProgress - current) * lerpSpeed;
-          const displayProgress = spaceshipCurrentProgressRef.current;
-
-          if (displayProgress >= 0) {
-            if (!spaceshipCtxRef.current) {
-              spaceshipCtxRef.current = spaceshipCanvas.getContext("2d", { alpha: false });
-            }
-            drawBlendedFrame(spaceshipCtxRef.current, spaceshipCanvas, spaceshipFramesRef, TOTAL_SPACESHIP_FRAMES, Math.min(displayProgress, 1));
-            currentSpaceshipFrameRef.current = Math.floor(displayProgress * TOTAL_SPACESHIP_FRAMES);
-          }
-        } else if (justScrolledPast && spaceshipCurrentProgressRef.current > 0.01) {
-          if (!spaceshipCtxRef.current) {
-            spaceshipCtxRef.current = spaceshipCanvas.getContext("2d", { alpha: false });
-          }
-          drawBlendedFrame(spaceshipCtxRef.current, spaceshipCanvas, spaceshipFramesRef, TOTAL_SPACESHIP_FRAMES, 1);
-        }
-      }
     };
 
     const tick = () => {
@@ -248,7 +201,8 @@ export default function Home() {
       if (!startTime) startTime = timestamp;
       const elapsed = (timestamp - startTime) / 1000;
 
-      const targetPush = heroHoverRef.current ? 50 : 0;
+      const isDesktop = typeof window !== "undefined" && window.innerWidth >= 640;
+      const targetPush = isDesktop && heroHoverRef.current ? 50 : 0;
       heroPushAmountRef.current += (targetPush - heroPushAmountRef.current) * pushLerpSpeed;
 
       const baseOffsets = [
@@ -295,7 +249,7 @@ export default function Home() {
     };
   }, []);
 
-  // Moderate scroll speed in the 2 video frame sections (dessert, spaceship)
+  // Moderate scroll speed in the video frame section (dessert)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -304,9 +258,8 @@ export default function Home() {
 
     const handleWheel = (e) => {
       const dessert = document.getElementById("section-dessert");
-      const spaceship = document.getElementById("section-spaceship");
 
-      const sections = [dessert, spaceship].filter(Boolean);
+      const sections = [dessert].filter(Boolean);
       const scrollY = window.scrollY || window.pageYOffset;
       const viewportHeight = window.innerHeight;
 
@@ -342,35 +295,6 @@ export default function Home() {
 
     let desertLoaded = false;
     let dessertLoaded = false;
-    let spaceshipLoaded = false;
-
-    const loadSpaceshipFrames = () => {
-      if (spaceshipLoaded) return;
-      spaceshipLoaded = true;
-
-      const frames = [];
-      let loadedCount = 0;
-      for (let i = 1; i <= TOTAL_SPACESHIP_FRAMES; i++) {
-        const img = new Image();
-        img.src = `/spaceship-frames/frame_${String(i).padStart(4, "0")}.png`;
-        img.onload = () => {
-          loadedCount++;
-          if (loadedCount === TOTAL_SPACESHIP_FRAMES) setSpaceshipFramesLoaded(true);
-        };
-        frames.push(img);
-      }
-      spaceshipFramesRef.current = frames;
-      const first = frames[0];
-      first.onload = () => {
-        const canvas = spaceshipCanvasRef.current;
-        if (canvas && first.complete) {
-          canvas.width = first.naturalWidth;
-          canvas.height = first.naturalHeight;
-          const ctx = canvas.getContext("2d", { alpha: false });
-          ctx?.drawImage(first, 0, 0, canvas.width, canvas.height);
-        }
-      };
-    };
 
     const loadDesertFrames = () => {
       if (desertLoaded) return;
@@ -434,7 +358,6 @@ export default function Home() {
           if (!entry.isIntersecting) return;
           if (entry.target.id === "section-hill") loadDesertFrames();
           if (entry.target.id === "section-dessert") loadDessertFrames();
-          if (entry.target.id === "section-spaceship") loadSpaceshipFrames();
         });
       },
       { rootMargin: "400px", threshold: 0 }
@@ -442,10 +365,8 @@ export default function Home() {
 
     const hill = document.getElementById("section-hill");
     const dessert = document.getElementById("section-dessert");
-    const spaceship = document.getElementById("section-spaceship");
     if (hill) observer.observe(hill);
     if (dessert) observer.observe(dessert);
-    if (spaceship) observer.observe(spaceship);
 
     return () => observer.disconnect();
   }, []);
@@ -566,7 +487,7 @@ export default function Home() {
           style={{ backgroundImage: "url(/herobg.jpg)" }}
         />
         <div
-          className="absolute inset-0 z-0 flex cursor-pointer items-center px-6 sm:px-8 md:px-16 lg:px-24"
+          className="absolute inset-0 z-0 flex cursor-pointer items-center px-6 sm:px-8 md:px-16 lg:px-24 sm:pointer-events-auto pointer-events-none"
           onMouseEnter={() => { heroHoverRef.current = true; }}
           onMouseLeave={() => { heroHoverRef.current = false; }}
         >
@@ -638,23 +559,6 @@ export default function Home() {
 
       {/* Terminal About section */}
       <AboutTerminal />
-
-      {/* Spaceship scroll animation section - before Skills */}
-      <section
-        ref={spaceshipSectionRef}
-        id="section-spaceship"
-        className="relative cursor-pointer bg-black"
-        style={{ height: "300vh" }}
-      >
-        <div className="sticky top-0 h-screen w-full overflow-hidden bg-black">
-          <canvas
-            ref={spaceshipCanvasRef}
-            className="h-full w-full object-cover"
-            style={{ display: "block" }}
-          />
-          <SpaceshipAbout />
-        </div>
-      </section>
 
       <section
         id="section-4"
