@@ -27,17 +27,19 @@ export default function ContactSection() {
   const cloudRefs = useRef([]);
   const hoverRef = useRef(false);
   const pushAmountRef = useRef(0);
+  const sectionRef = useRef(null);
+  const isVisibleRef = useRef(false);
+  const rafIdRef = useRef(null);
+  const startTimeRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let startTime = null;
-    let rafId;
     const pushLerpSpeed = 0.035;
 
     const animate = (timestamp) => {
-      if (!startTime) startTime = timestamp;
-      const elapsed = (timestamp - startTime) / 1000;
+      if (!startTimeRef.current) startTimeRef.current = timestamp;
+      const elapsed = (timestamp - startTimeRef.current) / 1000;
 
       if (contactRef.current) {
         const yOffset = Math.sin(elapsed * 0.9) * 8;
@@ -68,18 +70,36 @@ export default function ContactSection() {
         }
       });
 
-      rafId = requestAnimationFrame(animate);
+      // Only continue loop if section is visible
+      if (isVisibleRef.current) {
+        rafIdRef.current = requestAnimationFrame(animate);
+      } else {
+        rafIdRef.current = null;
+      }
     };
 
-    rafId = requestAnimationFrame(animate);
+    // Use IntersectionObserver to start/stop the loop
+    const sectionEl = sectionRef.current;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry.isIntersecting;
+        if (entry.isIntersecting && !rafIdRef.current) {
+          rafIdRef.current = requestAnimationFrame(animate);
+        }
+      },
+      { threshold: 0, rootMargin: "100px" }
+    );
+    if (sectionEl) observer.observe(sectionEl);
 
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
+      observer.disconnect();
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
   }, []);
 
   return (
     <section
+      ref={sectionRef}
       id="contact"
       className="relative min-h-screen flex items-center justify-center"
     >

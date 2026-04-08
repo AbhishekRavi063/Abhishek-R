@@ -77,7 +77,8 @@ export default function SkillsBubbles() {
       const width = container.offsetWidth;
       const height = container.offsetHeight;
       const isMobileDevice = width < 640;
-      const dpr = isMobileDevice ? Math.min(window.devicePixelRatio || 1, 2) : Math.min(window.devicePixelRatio || 1, 2);
+      // Cap DPR at 1 on mobile to halve pixel workload
+      const dpr = isMobileDevice ? 1 : Math.min(window.devicePixelRatio || 1, 2);
 
       canvas.width = width * dpr;
       canvas.height = height * dpr;
@@ -198,7 +199,8 @@ export default function SkillsBubbles() {
       }
 
       const baseRadius = isMobile ? Math.min(width, height) * 0.06 : Math.min(width, height) * 0.04;
-      const skillsToShow = isMobile ? SKILLS.slice(0, 14) : SKILLS;
+      // Reduce mobile skill count from 14 to 10 to ease physics + image load
+      const skillsToShow = isMobile ? SKILLS.slice(0, 10) : SKILLS;
 
       const bubbles = skillsToShow.map((skill) => {
         const textLen = skill.name.length;
@@ -291,7 +293,8 @@ export default function SkillsBubbles() {
       const minSpeed = 0.06;
 
       let lastFrameTime = performance.now();
-      const targetFps = isMobile ? 30 : 60;
+      // Lower mobile fps from 30 to 20 to free CPU for scroll/other animations
+      const targetFps = isMobile ? 20 : 60;
       const frameInterval = 1000 / targetFps;
 
       const render = (timestamp) => {

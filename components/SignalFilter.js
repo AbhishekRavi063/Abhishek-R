@@ -38,11 +38,18 @@ export default function SignalFilter() {
     const ctx = canvas.getContext("2d");
     let width = container.offsetWidth;
     let height = container.offsetHeight;
+    const isMobile = width < 640;
+    // On mobile render at half resolution to halve GPU workload
+    const canvasScale = isMobile ? 0.5 : 1;
 
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = Math.floor(width * canvasScale);
+    canvas.height = Math.floor(height * canvasScale);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    if (canvasScale !== 1) ctx.scale(canvasScale, canvasScale);
 
-    const BUFFER_SIZE = 800;
+    // Halve buffer on mobile — cuts per-frame math in half
+    const BUFFER_SIZE = isMobile ? 400 : 800;
     
     // Channel data
     const channel = {
@@ -307,8 +314,11 @@ export default function SignalFilter() {
     const handleResize = () => {
       width = container.offsetWidth;
       height = container.offsetHeight;
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = Math.floor(width * canvasScale);
+      canvas.height = Math.floor(height * canvasScale);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      if (canvasScale !== 1) ctx.setTransform(canvasScale, 0, 0, canvasScale, 0, 0);
     };
 
     window.addEventListener("resize", handleResize);

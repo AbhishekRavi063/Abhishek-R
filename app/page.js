@@ -47,13 +47,31 @@ export default function Home() {
   const [hillScrollProgress, setHillScrollProgress] = useState(0);
   const desertCurrentProgressRef = useRef(0);
   const dessertCurrentProgressRef = useRef(0);
+  // Mobile detection (used to halve frame counts)
+  const isMobileRef = useRef(false);
+  useEffect(() => {
+    isMobileRef.current = typeof window !== "undefined" && window.innerWidth < 640;
+  }, []);
+
+  // Visibility tracking for performance optimization
+  const heroVisibleRef = useRef(true);
+  const hillVisibleRef = useRef(false);
+  const dessertVisibleRef = useRef(false);
+
+  // Hero cloud positions (approx % from top-left) for push-away from text
+  const heroCloudPositions = [
+    { ref: leftCloudRef, cx: 12, cy: 75 },
+    { ref: rightCloudRef, cx: 88, cy: 75 },
+    { ref: centerCloudRef, cx: 50, cy: 75, center: true },
+    { ref: cloud4Ref, cx: 85, cy: 72 },
+    { ref: cloud5Ref, cx: 28, cy: 72 },
+  ];
+  const heroTextCenter = { x: 22, y: 45 };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const easeInOutCubic = (t) => {
-      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    };
+    const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     const lazyEase = (t) => 1 - Math.pow(1 - t, 1.8);
     const baseLerpSpeed = 0.055;
     const getLerpSpeed = (gap) => {
@@ -69,11 +87,10 @@ export default function Home() {
       const frac = Math.min(frameFloat - floorFrame, 1);
       const img0 = framesRef.current[floorFrame];
       const img1 = frac > 0.01 && floorFrame + 1 < totalFrames ? framesRef.current[floorFrame + 1] : null;
-      const isImageOk = (img) => img && img.complete && img.naturalWidth > 0;
-      if (isImageOk(img0)) {
+      if (img0 && img0.complete) {
         ctx.globalAlpha = 1;
         ctx.drawImage(img0, 0, 0, canvas.width, canvas.height);
-        if (isImageOk(img1)) {
+        if (img1 && img1.complete) {
           ctx.globalAlpha = frac;
           ctx.drawImage(img1, 0, 0, canvas.width, canvas.height);
           ctx.globalAlpha = 1;
@@ -81,168 +98,108 @@ export default function Home() {
       }
     };
 
-    const updateAnimations = () => {
+    // Shared intersection observers to manage visibility
+    const observerOptions = { threshold: 0 };
+    const heroObs = new IntersectionObserver(([e]) => { heroVisibleRef.current = e.isIntersecting; }, observerOptions);
+    const hillObs = new IntersectionObserver(([e]) => { hillVisibleRef.current = e.isIntersecting; }, observerOptions);
+    const dessertObs = new IntersectionObserver(([e]) => { dessertVisibleRef.current = e.isIntersecting; }, observerOptions);
+
+    if (heroRef.current) heroObs.observe(heroRef.current);
+    if (desertSectionRef.current) hillObs.observe(desertSectionRef.current);
+    if (dessertSectionRef.current) dessertObs.observe(dessertSectionRef.current);
+
+    let lastTime = 0;
+    const mobileInterval = 1000 / 30; // 30fps throttle for mobile
+
+    const updateAllAnimations = (timestamp) => {
+      const isMobile = isMobileRef.current;
+      if (isMobile && timestamp - lastTime < mobileInterval) {
+        rafRef.current = requestAnimationFrame(updateAllAnimations);
+        return;
+      }
+      lastTime = timestamp;
+
       const scrollY = window.scrollY || window.pageYOffset;
-      const viewportHeight =
-        window.innerHeight || document.documentElement.clientHeight;
+      const vh = window.innerHeight;
+      const elapsed = timestamp / 1000;
 
-      // Hill frames scroll animation - only when section is in view
-      const desertSection = desertSectionRef.current;
-      const desertCanvas = desertCanvasRef.current;
-      if (desertSection && desertCanvas && desertFramesRef.current.length > 0) {
-        const sectionTop = desertSection.offsetTop;
-        const sectionHeight = desertSection.offsetHeight;
-        const sectionBottom = sectionTop + sectionHeight;
+      // 1. Hero Clouds Animation
+      if (heroVisibleRef.current) {
+        const targetPush = !isMobile && heroHoverRef.current ? 50 : 0;
+        heroPushAmountRef.current += (targetPush - heroPushAmountRef.current) * 0.04;
 
-        const isInView = scrollY + viewportHeight > sectionTop && scrollY < sectionBottom;
+        const baseOffsets = [
+          { y: -80 + Math.sin(elapsed * 0.3) * 50, x: Math.cos(elapsed * 0.2) * 45 },
+          { y: -80 + Math.sin(elapsed * 0.3 + Math.PI * 0.66) * 55, x: Math.cos(elapsed * 0.22 + Math.PI * 0.5) * 50 },
+          { y: -100 + Math.sin(elapsed * 0.25 + Math.PI * 1.33) * 45, x: Math.cos(elapsed * 0.22 + Math.PI) * 40 },
+          { y: -60 + Math.sin(elapsed * 0.22 + Math.PI * 0.4) * 40, x: Math.cos(elapsed * 0.18 + Math.PI * 0.8) * 35 },
+          { y: -70 + Math.sin(elapsed * 0.2 + Math.PI * 1.8) * 35, x: Math.cos(elapsed * 0.24 + Math.PI * 1.2) * 30 },
+        ];
 
-        if (isInView) {
-          const startScroll = sectionTop - viewportHeight;
-          const endScroll = sectionBottom - viewportHeight;
-          const scrollRange = Math.max(1, endScroll - startScroll);
-          let targetProgress = (scrollY - startScroll) / scrollRange;
+        heroCloudPositions.forEach((pos, i) => {
+          const el = pos.ref?.current;
+          if (!el) return;
+          const dx = pos.cx - heroTextCenter.x;
+          const dy = pos.cy - heroTextCenter.y;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const pushX = (dx / len) * heroPushAmountRef.current;
+          const pushY = (dy / len) * heroPushAmountRef.current;
+          const base = baseOffsets[i];
+          const totalX = base.x + pushX;
+          const totalY = base.y + pushY;
+          if (pos.center) el.style.transform = `translate3d(calc(-50% + ${totalX}px), ${totalY}px, 0)`;
+          else el.style.transform = `translate3d(${totalX}px, ${totalY}px, 0)`;
+        });
+
+        if (headerRef.current) {
+          const hOffset = Math.sin(elapsed * 1.2) * 6;
+          headerRef.current.style.transform = `translateY(${hOffset}px)`;
+        }
+      }
+
+      // 2. Hill Scroll Animation - Block Scoped
+      {
+        if (hillVisibleRef.current && desertCanvasRef.current && desertFramesRef.current.length > 0) {
+          const section = desertSectionRef.current;
+          const startScroll = section.offsetTop - vh;
+          const endScroll = section.offsetTop + section.offsetHeight - vh;
+          let targetProgress = (scrollY - startScroll) / (endScroll - startScroll);
           targetProgress = Math.max(0, Math.min(1, easeInOutCubic(targetProgress)));
-
           const current = desertCurrentProgressRef.current;
           const gap = Math.abs(targetProgress - current);
           desertCurrentProgressRef.current += (targetProgress - current) * getLerpSpeed(gap);
           const displayProgress = desertCurrentProgressRef.current;
-
           setHillScrollProgress(displayProgress);
-
-          if (displayProgress >= 0) {
-            if (!desertCtxRef.current) {
-              desertCtxRef.current = desertCanvas.getContext("2d", { alpha: false });
-            }
-            drawBlendedFrame(desertCtxRef.current, desertCanvas, desertFramesRef, TOTAL_FRAMES, Math.min(displayProgress, 1));
-            currentFrameRef.current = Math.floor(displayProgress * TOTAL_FRAMES);
-          }
+          if (!desertCtxRef.current) desertCtxRef.current = desertCanvasRef.current.getContext("2d", { alpha: false });
+          drawBlendedFrame(desertCtxRef.current, desertCanvasRef.current, desertFramesRef, TOTAL_FRAMES, Math.min(displayProgress, 1));
         }
       }
 
-      // Dessert frames scroll animation - lazy/smooth, progresses slowly with scroll
-      const dessertSection = dessertSectionRef.current;
-      const dessertCanvas = dessertCanvasRef.current;
-      if (dessertSection && dessertCanvas && dessertFramesRef.current.length > 0) {
-        const sectionTop = dessertSection.offsetTop;
-        const sectionHeight = dessertSection.offsetHeight;
-        const sectionBottom = sectionTop + sectionHeight;
-
-        const isInView = scrollY + viewportHeight > sectionTop && scrollY < sectionBottom;
-
-        if (isInView) {
-          let targetProgress = (scrollY - sectionTop) / (sectionHeight - viewportHeight);
-          targetProgress = Math.max(0, Math.min(1, targetProgress));
-          targetProgress = lazyEase(targetProgress);
-
+      // 3. Dessert Scroll Animation - Block Scoped
+      {
+        if (dessertVisibleRef.current && dessertCanvasRef.current && dessertFramesRef.current.length > 0) {
+          const section = dessertSectionRef.current;
+          let targetProgress = (scrollY - section.offsetTop) / (section.offsetHeight - vh);
+          targetProgress = Math.max(0, Math.min(1, lazyEase(targetProgress)));
           const current = dessertCurrentProgressRef.current;
           const gap = Math.abs(targetProgress - current);
-          const lerpSpeed = getLerpSpeed(gap);
-          dessertCurrentProgressRef.current += (targetProgress - current) * lerpSpeed;
+          dessertCurrentProgressRef.current += (targetProgress - current) * getLerpSpeed(gap);
           const displayProgress = dessertCurrentProgressRef.current;
-
-          if (displayProgress >= 0) {
-            if (!dessertCtxRef.current) {
-              dessertCtxRef.current = dessertCanvas.getContext("2d", { alpha: false });
-            }
-            drawBlendedFrame(dessertCtxRef.current, dessertCanvas, dessertFramesRef, TOTAL_DESSERT_FRAMES, Math.min(displayProgress, 1));
-            currentDessertFrameRef.current = Math.floor(displayProgress * TOTAL_DESSERT_FRAMES);
-          }
+          if (!dessertCtxRef.current) dessertCtxRef.current = dessertCanvasRef.current.getContext("2d", { alpha: false });
+          drawBlendedFrame(dessertCtxRef.current, dessertCanvasRef.current, dessertFramesRef, TOTAL_DESSERT_FRAMES, Math.min(displayProgress, 1));
         }
       }
 
+      rafRef.current = requestAnimationFrame(updateAllAnimations);
     };
 
-    const tick = () => {
-      updateAnimations();
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    updateAnimations();
-    rafRef.current = requestAnimationFrame(tick);
-    window.addEventListener("scroll", updateAnimations, { passive: true });
+    rafRef.current = requestAnimationFrame(updateAllAnimations);
 
     return () => {
-      window.removeEventListener("scroll", updateAnimations);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
-  // Hero cloud positions (approx % from top-left) for push-away from text
-  const heroCloudPositions = [
-    { ref: leftCloudRef, cx: 12, cy: 75 },
-    { ref: rightCloudRef, cx: 88, cy: 75 },
-    { ref: centerCloudRef, cx: 50, cy: 75, center: true },
-    { ref: cloud4Ref, cx: 85, cy: 72 },
-    { ref: cloud5Ref, cx: 28, cy: 72 },
-  ];
-  const heroTextCenter = { x: 22, y: 45 };
-
-  // Floating cloud animation loop - pause when hero out of view to save CPU
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    let animationId;
-    let startTime = null;
-    let heroVisible = true;
-    const pushLerpSpeed = 0.04;
-
-    const heroEl = document.getElementById("hero");
-    const heroObs = heroEl ? new IntersectionObserver(([e]) => { heroVisible = e.isIntersecting; }, { threshold: 0 }) : null;
-    if (heroObs && heroEl) heroObs.observe(heroEl);
-
-    const animateClouds = (timestamp) => {
-      animationId = requestAnimationFrame(animateClouds);
-      if (!heroVisible) return;
-
-      if (!startTime) startTime = timestamp;
-      const elapsed = (timestamp - startTime) / 1000;
-
-      const isDesktop = typeof window !== "undefined" && window.innerWidth >= 640;
-      const targetPush = isDesktop && heroHoverRef.current ? 50 : 0;
-      heroPushAmountRef.current += (targetPush - heroPushAmountRef.current) * pushLerpSpeed;
-
-      const baseOffsets = [
-        { y: -80 + Math.sin(elapsed * 0.3) * 50, x: Math.cos(elapsed * 0.2) * 45 },
-        { y: -80 + Math.sin(elapsed * 0.3 + Math.PI * 0.66) * 55, x: Math.cos(elapsed * 0.22 + Math.PI * 0.5) * 50 },
-        { y: -100 + Math.sin(elapsed * 0.25 + Math.PI * 1.33) * 45, x: Math.cos(elapsed * 0.22 + Math.PI) * 40 },
-        { y: -60 + Math.sin(elapsed * 0.22 + Math.PI * 0.4) * 40, x: Math.cos(elapsed * 0.18 + Math.PI * 0.8) * 35 },
-        { y: -70 + Math.sin(elapsed * 0.2 + Math.PI * 1.8) * 35, x: Math.cos(elapsed * 0.24 + Math.PI * 1.2) * 30 },
-      ];
-
-      heroCloudPositions.forEach((pos, i) => {
-        const el = pos.ref?.current;
-        if (!el) return;
-
-        const dx = pos.cx - heroTextCenter.x;
-        const dy = pos.cy - heroTextCenter.y;
-        const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        const pushX = (dx / len) * heroPushAmountRef.current;
-        const pushY = (dy / len) * heroPushAmountRef.current;
-
-        const base = baseOffsets[i];
-        const totalX = base.x + pushX;
-        const totalY = base.y + pushY;
-
-        if (pos.center) {
-          el.style.transform = `translate3d(calc(-50% + ${totalX}px), ${totalY}px, 0)`;
-        } else {
-          el.style.transform = `translate3d(${totalX}px, ${totalY}px, 0)`;
-        }
-      });
-
-      // Header - subtle slow float up and down
-      if (headerRef.current) {
-        const yOffset = Math.sin(elapsed * 1.2) * 6;
-        headerRef.current.style.transform = `translateY(${yOffset}px)`;
-      }
-    };
-
-    animationId = requestAnimationFrame(animateClouds);
-
-    return () => {
-      if (animationId) cancelAnimationFrame(animationId);
-      if (heroObs && heroEl) heroObs.disconnect();
+      heroObs.disconnect();
+      hillObs.disconnect();
+      dessertObs.disconnect();
     };
   }, []);
 
@@ -297,56 +254,77 @@ export default function Home() {
       if (desertLoaded) return;
       desertLoaded = true;
 
-      const frames = [];
+      const isMobile = isMobileRef.current;
+      // On mobile: load every 2nd frame (75 instead of 150) to halve memory usage
+      const frameStep = isMobile ? 2 : 1;
+      const framesToLoad = isMobile ? Math.ceil(TOTAL_FRAMES / 2) : TOTAL_FRAMES;
+      const frames = new Array(TOTAL_FRAMES).fill(null);
       let loadedCount = 0;
-      for (let i = 1; i <= TOTAL_FRAMES; i++) {
+
+      for (let i = 1; i <= TOTAL_FRAMES; i += frameStep) {
         const img = new Image();
-        img.src = `/desert-frames/frame_${String(i).padStart(4, "0")}.jpg`;
         img.onload = () => {
           loadedCount++;
-          if (loadedCount === TOTAL_FRAMES) setDesertFramesLoaded(true);
+          if (loadedCount === framesToLoad) setDesertFramesLoaded(true);
         };
-        frames.push(img);
+        img.src = `/desert-frames/frame_${String(i).padStart(4, "0")}.jpg`;
+        // Fill both slots on mobile (frame i and i+1 point to same image)
+        frames[i - 1] = img;
+        if (isMobile && i + 1 <= TOTAL_FRAMES) frames[i] = img;
       }
       desertFramesRef.current = frames;
       const first = frames[0];
-      first.onload = () => {
-        const canvas = desertCanvasRef.current;
-        if (canvas && first.complete) {
-          canvas.width = first.naturalWidth;
-          canvas.height = first.naturalHeight;
-          const ctx = canvas.getContext("2d", { alpha: false });
-          ctx?.drawImage(first, 0, 0, canvas.width, canvas.height);
-        }
-      };
+      if (first) {
+        const setupCanvas = () => {
+          const canvas = desertCanvasRef.current;
+          if (canvas && first.complete && first.naturalWidth > 0) {
+            canvas.width = first.naturalWidth;
+            canvas.height = first.naturalHeight;
+            const ctx = canvas.getContext("2d", { alpha: false });
+            ctx?.drawImage(first, 0, 0, canvas.width, canvas.height);
+          }
+        };
+        if (first.complete) setupCanvas();
+        else first.onload = setupCanvas;
+      }
     };
 
     const loadDessertFrames = () => {
       if (dessertLoaded) return;
       dessertLoaded = true;
 
-      const frames = [];
+      const isMobile = isMobileRef.current;
+      // On mobile: load every 2nd frame (65 instead of 130) to halve memory usage
+      const frameStep = isMobile ? 2 : 1;
+      const framesToLoad = isMobile ? Math.ceil(TOTAL_DESSERT_FRAMES / 2) : TOTAL_DESSERT_FRAMES;
+      const frames = new Array(TOTAL_DESSERT_FRAMES).fill(null);
       let loadedCount = 0;
-      for (let i = 1; i <= TOTAL_DESSERT_FRAMES; i++) {
+
+      for (let i = 1; i <= TOTAL_DESSERT_FRAMES; i += frameStep) {
         const img = new Image();
-        img.src = `/dessert-frames/frame_${String(i).padStart(4, "0")}.png`;
         img.onload = () => {
           loadedCount++;
-          if (loadedCount === TOTAL_DESSERT_FRAMES) setDessertFramesLoaded(true);
+          if (loadedCount === framesToLoad) setDessertFramesLoaded(true);
         };
-        frames.push(img);
+        img.src = `/dessert-frames/frame_${String(i).padStart(4, "0")}.png`;
+        frames[i - 1] = img;
+        if (isMobile && i + 1 <= TOTAL_DESSERT_FRAMES) frames[i] = img;
       }
       dessertFramesRef.current = frames;
       const first = frames[0];
-      first.onload = () => {
-        const canvas = dessertCanvasRef.current;
-        if (canvas && first.complete) {
-          canvas.width = first.naturalWidth;
-          canvas.height = first.naturalHeight;
-          const ctx = canvas.getContext("2d", { alpha: false });
-          ctx?.drawImage(first, 0, 0, canvas.width, canvas.height);
-        }
-      };
+      if (first) {
+        const setupCanvas = () => {
+          const canvas = dessertCanvasRef.current;
+          if (canvas && first.complete && first.naturalWidth > 0) {
+            canvas.width = first.naturalWidth;
+            canvas.height = first.naturalHeight;
+            const ctx = canvas.getContext("2d", { alpha: false });
+            ctx?.drawImage(first, 0, 0, canvas.width, canvas.height);
+          }
+        };
+        if (first.complete) setupCanvas();
+        else first.onload = setupCanvas;
+      }
     };
 
     const observer = new IntersectionObserver(
